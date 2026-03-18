@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Form</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        padding: 40px;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: auto;
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      h2 {
+        margin-bottom: 15px;
+      }
+
+      /* Form row */
+      form {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      form input,
+      form select {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      form button {
+        padding: 10px 20px;
+        border: none;
+        background: #007bff;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      form button:hover {
+        background: #0056b3;
+      }
+
+      /* Search */
+      .search-box {
+        margin-bottom: 15px;
+      }
+
+      .search-box input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      /* Table */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      thead {
+        background: #007bff;
+        color: white;
+      }
+
+      th,
+      td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+
+      tbody tr:hover {
+        background: #f1f1f1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Add User</h2>
+
+      <form>
+        <input type="text" placeholder="Full Name" id="full_name" required />
+
+        <select required id="sex">
+          <option value="">Sex</option>
+          <option>Male</option>
+          <option>Female</option>
+        </select>
+
+        <input type="email" id="email" placeholder="Email" required />
+
+        <button type="submit">Add</button>
+      </form>
+
+      <!-- Search -->
+      <div class="search-box">
+        <input type="number" id="search" placeholder="Search user by id..." />
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Full Name</th>
+            <th>Sex</th>
+            <th>Email</th>
+            <th>actions</th>
+          </tr>
+        </thead>
+        <tbody id="display"></tbody>
+      </table>
+      <p>Total: <span id="total">1</span></p>
+    </div>
+    <script>
+      const form = document.querySelector("form");
+      const search = document.getElementById("search");
+
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById("full_name").value;
+        const sex = document.getElementById("sex").value;
+        const email = document.getElementById("email").value;
+
+        try {
+          const res = await fetch("/users", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name, sex, email }),
+          });
+
+          if (!res.ok) {
+            console.log("An unexpected error occoured");
+          }
+
+          const data = await res.json();
+
+          if (data.success === true) {
+            await fetchUsers();
+
+            form.reset();
+          } else {
+            alert(data.message);
+          }
+        } catch (e) {
+          console.log("failed to submit" + e);
+        }
+      };
+
+      async function fetchUsers() {
+        const display = document.getElementById("display");
+        const total = document.getElementById("total");
+
+        display.innerHTML = "";
+
+        try {
+          const res = await fetch("/users");
+
+          const data = await res.json();
+          const users = await data.user;
+          total.innerText = (await data.total) ?? 0;
+
+          try {
+            users.forEach((user) => {
+              const template = ` <tr>
+            <td>${user.full_name}</td>
+            <td>${user.sex}</td>
+            <td>${user.email}</td>
+            <td><button onclick="deleteUser(${user.id})">delete</button><td>
+          </tr>`;
+
+              display.innerHTML += template;
+            });
+          } catch (e) {
+            display.innerHTML = `<tr">No user found</tr>`;
+          }
+        } catch (e) {
+          console.log("failed to fetch" + e);
+        }
+      }
+
+      window.onload = fetchUsers;
+
+      async function deleteUser(id) {
+        const res = await fetch("/users", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ id }),
+        });
+
+        if (!res.ok) {
+          console.log("An unexpected error occoured");
+        }
+
+        const data = await res.json();
+
+        if (data.success === true) {
+          await fetchUsers();
+        } else {
+          alert(data.message);
+        }
+      }
+
+      search.onchange = async () => {
+        const display = document.getElementById("display");
+        const total = document.getElementById("total");
+
+        display.innerHTML = "";
+        const value = search.value;
+
+        if (value === "") {
+          return await fetchUsers();
+        }
+        try {
+          const res = await fetch(`/users/${value}`);
+
+          const data = await res.json();
+          const users = await data.user;
+          total.innerText = (await data.total) ?? 0;
+
+          try {
+            const template = ` <tr>
+            <td>${users.full_name}</td>
+            <td>${users.sex}</td>
+            <td>${users.email}</td>
+            <td><button onclick="deleteUser(${users.id})">delete</button><td>
+          </tr>`;
+
+            display.innerHTML += template;
+          } catch (e) {
+            display.innerHTML = `<tr">No user found</tr>`;
+          }
+        } catch (e) {
+          console.log("failed to fetch" + e);
+        }
+      };
+    </script>
+  </body>
+</html>
